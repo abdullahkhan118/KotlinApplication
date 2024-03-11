@@ -18,7 +18,9 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.sync.withPermit
 
 @Composable
 @Preview
@@ -26,6 +28,7 @@ fun App() {
 
     var text by remember { mutableStateOf("Hello, World!") }
     val scope = rememberCoroutineScope { Dispatchers.IO }
+    val semaphore = Semaphore(5) // Initialize semaphore with 1 permit
     val _documentState = MutableStateFlow(
         DocumentState(
             arrayOf(
@@ -35,22 +38,25 @@ fun App() {
     )
 
     var textList by remember { mutableStateOf("") }
-
     var count by remember { mutableStateOf(0) }
 
     MaterialTheme {
         Button(onClick = {
             text = "Hello, Desktop!"
             scope.launch {
-                delay(5000)
-                _documentState.updateWithLock {
-                    val list = it.documents.mapIndexed { index, document ->
-                        Document("Document ${count * (index+1)}")
-                    }.toTypedArray()
-                    count++
-                    it.copy(list, it.showVehicles).also {
-                        println(it.toString())
-                        textList = "$textList \n $it"
+                _documentState.update {
+                    println("Permits: ${semaphore.availablePermits}")
+                    delay(count*1000L)
+                    semaphore.withPermit {
+                        println("Permits: ${semaphore.availablePermits}")
+                        val list = it.documents.mapIndexed { index, document ->
+                            Document("Document ${count * (index+1)}")
+                        }.toTypedArray()
+                        count++
+                        it.copy(list, it.showVehicles).also {
+                            println(it.toString())
+                            textList = "$textList \n $it"
+                        }
                     }
                 }
             }
@@ -60,6 +66,7 @@ fun App() {
 
         Text(text = textList)
     }
+
 }
 
 fun main() = application {

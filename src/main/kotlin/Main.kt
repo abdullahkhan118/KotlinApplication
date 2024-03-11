@@ -17,15 +17,17 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.sync.withPermit
 
 @Composable
 @Preview
 fun App() {
 
-    val mutex = Mutex()
     var text by remember { mutableStateOf("Hello, World!") }
     val scope = rememberCoroutineScope { Dispatchers.IO }
+    val semaphore = Semaphore(5) // Initialize semaphore with 1 permit
     val _documentState = MutableStateFlow(
         DocumentState(
             arrayOf(
@@ -35,7 +37,6 @@ fun App() {
     )
 
     var textList by remember { mutableStateOf("") }
-
     var count by remember { mutableStateOf(0) }
 
     MaterialTheme {
@@ -43,12 +44,13 @@ fun App() {
             text = "Hello, Desktop!"
             scope.launch {
                 _documentState.update {
-                    delay(5000)
-                    mutex.withLock {
-                        val list = it.documents.map {
-                            it
+                    println("Permits: ${semaphore.availablePermits}")
+                    delay(count*1000L)
+                    semaphore.withPermit {
+                        println("Permits: ${semaphore.availablePermits}")
+                        val list = it.documents.mapIndexed { index, document ->
+                            Document("Document ${count * (index+1)}")
                         }.toTypedArray()
-                        list[count % list.size] = list[count % list.size].copy(name = "Document ${count + 1}")
                         count++
                         it.copy(list, it.showVehicles).also {
                             println(it.toString())
@@ -63,6 +65,7 @@ fun App() {
 
         Text(text = textList)
     }
+
 }
 
 fun main() = application {

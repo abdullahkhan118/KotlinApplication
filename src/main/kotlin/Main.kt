@@ -11,6 +11,7 @@ import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import kotlinx.coroutines.flow.MutableStateFlow
 import androidx.compose.runtime.*
+import extensions.updateWithLock
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.asStateFlow
@@ -23,7 +24,6 @@ import kotlinx.coroutines.sync.withLock
 @Preview
 fun App() {
 
-    val mutex = Mutex()
     var text by remember { mutableStateOf("Hello, World!") }
     val scope = rememberCoroutineScope { Dispatchers.IO }
     val _documentState = MutableStateFlow(
@@ -42,18 +42,15 @@ fun App() {
         Button(onClick = {
             text = "Hello, Desktop!"
             scope.launch {
-                _documentState.update {
-                    delay(5000)
-                    mutex.withLock {
-                        val list = it.documents.map {
-                            it
-                        }.toTypedArray()
-                        list[count % list.size] = list[count % list.size].copy(name = "Document ${count + 1}")
-                        count++
-                        it.copy(list, it.showVehicles).also {
-                            println(it.toString())
-                            textList = "$textList \n $it"
-                        }
+                delay(5000)
+                _documentState.updateWithLock {
+                    val list = it.documents.mapIndexed { index, document ->
+                        Document("Document ${count * (index+1)}")
+                    }.toTypedArray()
+                    count++
+                    it.copy(list, it.showVehicles).also {
+                        println(it.toString())
+                        textList = "$textList \n $it"
                     }
                 }
             }
